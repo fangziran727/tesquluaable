@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>体育馆预约后台</title>
+  <link rel="stylesheet" href="./admin.css">
+</head>
+<body>
+  <main class="admin-shell">
+    <section class="hero-panel" aria-labelledby="pageTitle">
+      <div>
+        <p class="school-mark">SYSU Sports</p>
+        <h1 id="pageTitle">预约后台</h1>
+        <p class="hero-copy">在这里登记游泳池和健身房预约。保存成功后，手机展示页会读取同一份数据。</p>
+      </div>
+      <a class="display-link" href="/" target="_blank" rel="noreferrer">打开展示页</a>
+    </section>
+
+    <section class="workbench" aria-label="后台操作区">
+      <form class="reservation-form" id="reservationForm">
+        <h2>新增预约</h2>
+        <label>
+          <span>后台口令</span>
+          <input id="adminToken" name="adminToken" type="password" autocomplete="current-password" placeholder="默认本地口令：admin123" required>
+        </label>
+        <label>
+          <span>体育项目</span>
+          <select id="venue" name="venue" required></select>
+        </label>
+        <label>
+          <span>预约日期</span>
+          <input id="date" name="date" type="date" required>
+        </label>
+        <label>
+          <span>预约时间</span>
+          <select id="reservationTime" name="reservationTime" required></select>
+        </label>
+        <label>
+          <span>推送时间</span>
+          <input id="sentAt" name="sentAt" type="time" step="60">
+        </label>
+        <button class="primary-action" type="submit">保存预约</button>
+        <p class="form-hint">推送时间留空时，服务端会使用当前时间。</p>
+        <p class="status-line" id="statusLine" role="status" aria-live="polite"></p>
+      </form>
+
+      <section class="list-panel" aria-labelledby="listTitle">
+        <div class="list-heading">
+          <div>
+            <h2 id="listTitle">当前预约</h2>
+            <p id="reservationCount">正在读取预约数据</p>
+          </div>
+          <button class="secondary-action" id="refreshButton" type="button">刷新</button>
+        </div>
+        <div class="reservation-list" id="reservationList"></div>
+      </section>
+    </section>
+  </main>
+
+  <template id="reservationItemTemplate">
+    <article class="reservation-item">
+      <div>
+        <h3 class="item-venue"></h3>
+        <p class="item-time"></p>
+        <p class="item-meta"></p>
+      </div>
+      <button class="danger-action" type="button">取消</button>
+    </article>
+  </template>
+
+  <script src="./admin.js"></script>
+</body>
+</html>

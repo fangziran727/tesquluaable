@@ -5,6 +5,14 @@
   var campusScreen = document.getElementById("campusScreen");
   var MINUTES_PER_DAY = 24 * 60 * 60 * 1000;
   var HISTORY_DAYS = 7;
+  var RESERVATION_DATA_URL = "/api/reservations";
+  var RESERVATION_OPTIONS = {
+    "深圳校区游泳池-场地1": ["06:30", "16:30", "19:30"],
+    "深圳校区健身房-场地1": ["10:00", "12:30", "14:00", "16:00", "18:00", "20:00"]
+  };
+  var VENUE_ORDER = ["深圳校区游泳池-场地1", "深圳校区健身房-场地1"];
+  var DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+  var TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
   function pad(value) {
     return String(value).padStart(2, "0");
@@ -18,35 +26,79 @@
     ].join("-");
   }
 
-  function shiftedDate(baseDate, offsetDays) {
-    return new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate() + offsetDays);
-  }
-
   function daySerial(date) {
     return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / MINUTES_PER_DAY);
   }
 
-  // Swimming pool is closed for one week starting 2026-08-22.
-  var POOL_CLOSURE_START_SERIAL = daySerial(new Date(2026, 7, 22));
-  var POOL_CLOSURE_END_SERIAL = POOL_CLOSURE_START_SERIAL + 7;
-  var REMOVED_RESERVATION_SERIALS = [
-    daySerial(new Date(2026, 7, 22)),
-    daySerial(new Date(2026, 7, 23))
-  ];
-
-  function pseudoRandom(date, salt) {
-    return (daySerial(date) * 37 + salt * 101 + 23) % 997;
+  function timeToMinutes(time) {
+    var parts = time.split(":");
+    return Number(parts[0]) * 60 + Number(parts[1]);
   }
 
-  function dailySendTimes(date) {
-    var firstMinutes = 9 * 60 + pseudoRandom(date, 1) % 61;
-    var gapMinutes = 20 + pseudoRandom(date, 2) % 101;
-    var secondMinutes = firstMinutes + gapMinutes;
+  function parseReservationDate(value) {
+    if (typeof value !== "string") return null;
+    var match = DATE_PATTERN.exec(value.trim());
+    if (!match) return null;
+    var year = Number(match[1]);
+    var month = Number(match[2]);
+    var day = Number(match[3]);
+    var date = new Date(year, month - 1, day);
+    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+      return null;
+    }
+    return date;
+  }
 
-    return [
-      pad(Math.floor(firstMinutes / 60)) + ":" + pad(firstMinutes % 60),
-      pad(Math.floor(secondMinutes / 60)) + ":" + pad(secondMinutes % 60)
-    ];
+  function normalizeReservation(raw, index) {
+    if (!raw || typeof raw !== "object") return null;
+    var venue = typeof raw.venue === "string" ? raw.venue.trim() : "";
+    var reservationTime = typeof raw.reservationTime === "string" ? raw.reservationTime.trim() : "";
+    var sentAt = typeof raw.sentAt === "string" ? raw.sentAt.trim() : "";
+    var allowedTimes = RESERVATION_OPTIONS[venue];
+    var date = parseReservationDate(raw.date);
+
+    if (!allowedTimes || allowedTimes.indexOf(reservationTime) === -1 || !date) {
+      return null;
+    }
+    if (sentAt && !TIME_PATTERN.test(sentAt)) {
+      return null;
+    }
+
+    return {
+      id: typeof raw.id === "string" ? raw.id : "",
+      venue: venue,
+      date: date,
+      reservationTime: reservationTime,
+      sentAt: sentAt || reservationTime,
+      sourceIndex: index
+    };
+  }
+
+  function compareMessages(left, right) {
+    var dateDiff = daySerial(left.date) - daySerial(right.date);
+    if (dateDiff !== 0) return dateDiff;
+    var sentDiff = timeToMinutes(left.sentAt) - timeToMinutes(right.sentAt);
+    if (sentDiff !== 0) return sentDiff;
+    var venueDiff = VENUE_ORDER.indexOf(left.venue) - VENUE_ORDER.indexOf(right.venue);
+    if (venueDiff !== 0) return venueDiff;
+    var reservationDiff = timeToMinutes(left.reservationTime) - timeToMinutes(right.reservationTime);
+    if (reservationDiff !== 0) return reservationDiff;
+    return left.sourceIndex - right.sourceIndex;
+  }
+
+  function loadReservations() {
+    if (!window.fetch) return Promise.resolve([]);
+    return fetch(RESERVATION_DATA_URL, { cache: "no-store" }).then(function (response) {
+      if (!response.ok) throw new Error("Reservation data request failed");
+      return response.json();
+    }).then(function (data) {
+      if (!Array.isArray(data)) return [];
+      return data.map(normalizeReservation).filter(function (message) {
+        return message !== null;
+      });
+    }).catch(function () {
+      return [];
+    });
   }
 
   var WEEKDAY_NAMES = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
@@ -95,6 +147,9 @@
 
     fragment.querySelector(".venue").textContent = message.venue;
     fragment.querySelector(".reservation-time").textContent = formatDate(message.date) + " " + message.reservationTime;
+    if (message.id) {
+      card.dataset.reservationId = message.id;
+    }
     card.setAttribute("role", "button");
     card.setAttribute("tabindex", "0");
     card.addEventListener("click", showCampusScreen);
@@ -107,36 +162,23 @@
     cardsRoot.appendChild(fragment);
   }
 
-  function dailyMessages(date) {
-    var serial = daySerial(date);
-    if (REMOVED_RESERVATION_SERIALS.indexOf(serial) !== -1) {
-      return [];
-    }
-    var sendTimes = dailySendTimes(date);
-    var messages = [
-      { venue: "深圳校区游泳池-场地1", date: date, reservationTime: "16:30", sentAt: sendTimes[0] },
-      { venue: "深圳校区健身房-场地1", date: date, reservationTime: "16:00", sentAt: sendTimes[1] }
-    ];
-    var poolPaused = serial >= POOL_CLOSURE_START_SERIAL && serial < POOL_CLOSURE_END_SERIAL;
-    return messages.filter(function (message) {
-      return !(poolPaused && message.venue.indexOf("游泳池") !== -1);
+  function renderMessages(messages) {
+    var today = new Date();
+    cardsRoot.textContent = "";
+
+    messages.filter(function (message) {
+      var daysAgo = daysBetween(message.date, today);
+      return daysAgo >= 0 && daysAgo <= HISTORY_DAYS;
+    }).sort(compareMessages).forEach(function (message) {
+      appendTimeLabel(chatTimeLabel(message.date, message.sentAt));
+      appendMessage(message);
     });
   }
 
-  function renderMessages() {
-    var today = new Date();
-    var messageGroups = [];
-    for (var offset = -HISTORY_DAYS; offset <= 0; offset += 1) {
-      messageGroups.push(shiftedDate(today, offset));
-    }
-
-    cardsRoot.textContent = "";
-
-    messageGroups.forEach(function (date) {
-      dailyMessages(date).forEach(function (message) {
-        appendTimeLabel(chatTimeLabel(message.date, message.sentAt));
-        appendMessage(message);
-      });
+  function loadAndRenderMessages() {
+    return loadReservations().then(function (messages) {
+      renderMessages(messages);
+      scheduleScrollToBottom();
     });
   }
 
@@ -433,8 +475,7 @@
   }
 
   blockPinchZoom();
-  renderMessages();
-  scheduleScrollToBottom();
+  loadAndRenderMessages();
 
   if (window.location.hash === "#campus") {
     showCampusScreen(false);

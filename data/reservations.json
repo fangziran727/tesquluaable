@@ -1,0 +1,46 @@
+[
+  {
+    "id": "sample-2026-09-18-pool-1630",
+    "venue": "深圳校区游泳池-场地1",
+    "date": "2026-09-18",
+    "reservationTime": "16:30",
+    "sentAt": "09:18"
+  },
+  {
+    "id": "sample-2026-09-19-gym-1800",
+    "venue": "深圳校区健身房-场地1",
+    "date": "2026-09-19",
+    "reservationTime": "18:00",
+    "sentAt": "10:06"
+  },
+  {
+    "id": "sample-2026-09-20-pool-1930",
+    "venue": "深圳校区游泳池-场地1",
+    "date": "2026-09-20",
+    "reservationTime": "19:30",
+    "sentAt": "09:47"
+  },
+  {
+    "id": "sample-2026-09-21-gym-1600",
+    "venue": "深圳校区健身房-场地1",
+    "date": "2026-09-21",
+    "reservationTime": "16:00",
+    "sentAt": "09:56"
+  },
+  {
+    "id": "398b03da-5004-4aba-ae7c-e4c3f56bb2cd",
+    "venue": "深圳校区游泳池-场地1",
+    "date": "2026-09-23",
+    "reservationTime": "19:30",
+    "sentAt": "08:52",
+    "createdAt": "2026-09-21T11:39:24.988Z"
+  },
+  {
+    "id": "c3a47980-9b4c-4740-a486-be3659f0dc55",
+    "venue": "深圳校区游泳池-场地1",
+    "date": "2026-09-23",
+    "reservationTime": "16:30",
+    "sentAt": "19:40",
+    "createdAt": "2026-09-21T11:39:48.270Z"
+  }
+]

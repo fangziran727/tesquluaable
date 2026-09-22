@@ -1,0 +1,320 @@
+:root {
+  color-scheme: light;
+  --ink: #182a2d;
+  --muted: #6c7d7d;
+  --line: #dce8e5;
+  --paper: #f5f8f5;
+  --panel: #ffffff;
+  --deep: #0b4f53;
+  --deep-2: #083d42;
+  --mint: #c8eee0;
+  --coral: #d8674b;
+  --shadow: 0 22px 60px rgba(22, 66, 63, 0.13);
+  font-family: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid #e8a34e;
+  outline-offset: 3px;
+}
+
+.admin-shell {
+  width: min(1120px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 32px 0 56px;
+}
+
+.hero-panel {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 32px;
+  min-height: 250px;
+  padding: 42px 48px;
+  color: #f6fffb;
+  background:
+    radial-gradient(circle at 88% 12%, rgba(200, 238, 224, 0.2), transparent 26%),
+    linear-gradient(135deg, var(--deep), var(--deep-2));
+  box-shadow: var(--shadow);
+}
+
+.school-mark {
+  margin: 0 0 34px;
+  color: var(--mint);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 14px;
+  font-family: Georgia, "Songti SC", serif;
+  font-size: clamp(42px, 7vw, 76px);
+  font-weight: 400;
+  letter-spacing: -0.06em;
+  line-height: 0.94;
+}
+
+.hero-copy {
+  max-width: 410px;
+  margin-bottom: 0;
+  color: rgba(246, 255, 251, 0.78);
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+.display-link {
+  flex: 0 0 auto;
+  padding: 11px 17px;
+  color: var(--deep-2);
+  background: var(--mint);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.workbench {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.78fr) minmax(420px, 1.22fr);
+  gap: 1px;
+  margin-top: 1px;
+  background: var(--line);
+  box-shadow: var(--shadow);
+}
+
+.reservation-form,
+.list-panel {
+  min-width: 0;
+  padding: 34px 38px 40px;
+  background: var(--panel);
+}
+
+h2 {
+  margin-bottom: 26px;
+  font-size: 21px;
+  font-weight: 700;
+}
+
+label {
+  display: block;
+  margin-bottom: 18px;
+}
+
+label span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+input,
+select {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 13px;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: #fbfdfb;
+}
+
+input::placeholder {
+  color: #9aa9a7;
+}
+
+.primary-action,
+.secondary-action,
+.danger-action {
+  border: 0;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.primary-action {
+  width: 100%;
+  min-height: 50px;
+  margin-top: 7px;
+  color: #f6fffb;
+  background: var(--deep);
+}
+
+.primary-action:hover,
+.primary-action:active {
+  background: var(--deep-2);
+}
+
+.form-hint,
+.status-line,
+#reservationCount {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.form-hint {
+  margin: 11px 0 0;
+}
+
+.status-line {
+  min-height: 20px;
+  margin: 8px 0 0;
+}
+
+.status-line[data-state="success"] {
+  color: #28785a;
+}
+
+.status-line[data-state="error"] {
+  color: #b44b39;
+}
+
+.list-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 22px;
+}
+
+.list-heading h2 {
+  margin-bottom: 6px;
+}
+
+#reservationCount {
+  margin-bottom: 0;
+}
+
+.secondary-action {
+  padding: 10px 15px;
+  color: var(--deep);
+  border: 1px solid var(--line);
+  background: #fff;
+}
+
+.reservation-list {
+  display: grid;
+  gap: 10px;
+}
+
+.reservation-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 17px 18px;
+  border-left: 4px solid var(--mint);
+  background: #f7fbf9;
+}
+
+.item-venue {
+  margin-bottom: 5px;
+  font-size: 15px;
+}
+
+.item-time,
+.item-meta {
+  margin-bottom: 0;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.item-time {
+  color: var(--deep);
+  font-weight: 700;
+}
+
+.item-meta {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.danger-action {
+  flex: 0 0 auto;
+  padding: 8px 11px;
+  color: var(--coral);
+  background: transparent;
+  border: 1px solid rgba(216, 103, 75, 0.35);
+}
+
+.empty-state {
+  padding: 32px 0;
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .admin-shell {
+    width: min(100% - 24px, 560px);
+    padding-top: 12px;
+  }
+
+  .hero-panel {
+    display: block;
+    min-height: auto;
+    padding: 30px 26px 28px;
+  }
+
+  .school-mark {
+    margin-bottom: 28px;
+  }
+
+  .display-link {
+    display: inline-block;
+    margin-top: 24px;
+  }
+
+  .workbench {
+    display: block;
+  }
+
+  .reservation-form,
+  .list-panel {
+    padding: 28px 24px 32px;
+  }
+
+  .list-panel {
+    border-top: 1px solid var(--line);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+}
