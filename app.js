@@ -89,6 +89,10 @@
   function loadReservations() {
     if (!window.fetch) return Promise.resolve([]);
     return fetch(RESERVATION_DATA_URL, { cache: "no-store" }).then(function (response) {
+      if (response.status === 401) {
+        window.location.replace("/login?next=%2F");
+        return [];
+      }
       if (!response.ok) throw new Error("Reservation data request failed");
       return response.json();
     }).then(function (data) {
@@ -96,7 +100,11 @@
       return data.map(normalizeReservation).filter(function (message) {
         return message !== null;
       });
-    }).catch(function () {
+    }).catch(function (error) {
+      if (error && error.status === 401) {
+        window.location.replace("/login?next=%2F");
+        return [];
+      }
       return [];
     });
   }

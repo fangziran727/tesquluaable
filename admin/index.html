@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
-  <title>体育馆预约后台</title>
+  <title>预约提交系统</title>
   <link rel="stylesheet" href="./admin.css">
 </head>
 <body>
@@ -12,7 +12,7 @@
     <section class="hero-panel" aria-labelledby="pageTitle">
       <div>
         <p class="school-mark">SYSU Sports</p>
-        <h1 id="pageTitle">预约后台</h1>
+        <h1 id="pageTitle">预约提交系统</h1>
         <p class="hero-copy">在这里登记游泳池和健身房预约。保存成功后，手机展示页会读取同一份数据。</p>
       </div>
       <a class="display-link" href="/" target="_blank" rel="noreferrer">打开展示页</a>
@@ -21,10 +21,6 @@
     <section class="workbench" aria-label="后台操作区">
       <form class="reservation-form" id="reservationForm">
         <h2>新增预约</h2>
-        <label>
-          <span>后台口令</span>
-          <input id="adminToken" name="adminToken" type="password" autocomplete="current-password" placeholder="默认本地口令：admin123" required>
-        </label>
         <label>
           <span>体育项目</span>
           <select id="venue" name="venue" required></select>

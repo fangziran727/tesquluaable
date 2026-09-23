@@ -1,6 +1,5 @@
 (function () {
   var form = document.getElementById("reservationForm");
-  var tokenField = document.getElementById("adminToken");
   var venueField = document.getElementById("venue");
   var dateField = document.getElementById("date");
   var timeField = document.getElementById("reservationTime");
@@ -81,8 +80,16 @@
     });
   }
 
+  function redirectToLogin() {
+    window.location.replace("/login?next=%2Fadmin%2F");
+  }
+
   function loadOptions() {
     return fetch("/api/options", { cache: "no-store" }).then(function (response) {
+      if (response.status === 401) {
+        redirectToLogin();
+        throw new Error("请先登录");
+      }
       if (!response.ok) throw new Error("读取预约选项失败");
       return response.json();
     }).then(function (data) {
@@ -93,6 +100,10 @@
 
   function loadReservations() {
     return fetch("/api/reservations", { cache: "no-store" }).then(function (response) {
+      if (response.status === 401) {
+        redirectToLogin();
+        throw new Error("请先登录");
+      }
       if (!response.ok) throw new Error("读取预约列表失败");
       return response.json();
     }).then(function (data) {
@@ -102,6 +113,10 @@
   }
 
   function readError(response) {
+    if (response.status === 401) {
+      redirectToLogin();
+      return Promise.reject(new Error("请先登录"));
+    }
     return response.json().then(function (data) {
       throw new Error(data.error || "请求失败");
     }).catch(function (error) {
@@ -122,8 +137,7 @@
     fetch("/api/reservations", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        "X-Admin-Token": tokenField.value
+        "Content-Type": "application/json"
       },
       body: JSON.stringify(payload)
     }).then(function (response) {
@@ -145,9 +159,7 @@
     setStatus("正在取消……");
     fetch("/api/reservations/" + encodeURIComponent(reservation.id), {
       method: "DELETE",
-      headers: {
-        "X-Admin-Token": tokenField.value
-      }
+      headers: {}
     }).then(function (response) {
       if (!response.ok) return readError(response);
       return response.json();

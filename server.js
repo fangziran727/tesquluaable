@@ -8,9 +8,12 @@ const DATA_DIR = path.join(ROOT_DIR, "data");
 const DATA_FILE = path.join(DATA_DIR, "reservations.json");
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || "127.0.0.1";
-const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "admin123";
-const CORS_ORIGIN = process.env.CORS_ORIGIN || "";
+const ACCESS_PASSWORD = process.env.ACCESS_PASSWORD || "";
 const MAX_BODY_BYTES = 32 * 1024;
+const SESSION_COOKIE = "sysu_sports_session";
+const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_MAX_FAILURES = 5;
 
 const RESERVATION_OPTIONS = {
   "深圳校区游泳池-场地1": ["06:30", "16:30", "19:30"],
@@ -32,6 +35,8 @@ const MIME_TYPES = {
 };
 
 let dataQueue = Promise.resolve();
+const sessions = new Map();
+const loginFailures = new Map();
 
 function pad(value) {
   return String(value).padStart(2, "0");
@@ -101,17 +106,142 @@ function sendError(response, statusCode, message) {
 
 function setApiHeaders(response) {
   response.setHeader("X-Content-Type-Options", "nosniff");
-  if (CORS_ORIGIN) {
-    response.setHeader("Access-Control-Allow-Origin", CORS_ORIGIN);
-    response.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Admin-Token");
-    response.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
-    response.setHeader("Vary", "Origin");
+  response.setHeader("Cache-Control", "no-store");
+}
+
+function parseCookies(header) {
+  const cookies = {};
+  (header || "").split(";").forEach((part) => {
+    const separator = part.indexOf("=");
+    if (separator === -1) return;
+    const name = part.slice(0, separator).trim();
+    const value = part.slice(separator + 1).trim();
+    cookies[name] = value;
+  });
+  return cookies;
+}
+
+function getSession(request) {
+  const sessionId = parseCookies(request.headers.cookie)[SESSION_COOKIE];
+  if (!sessionId) return null;
+  const expiresAt = sessions.get(sessionId);
+  if (!expiresAt || expiresAt <= Date.now()) {
+    sessions.delete(sessionId);
+    return null;
+  }
+  return sessionId;
+}
+
+function hasValidSession(request) {
+  return getSession(request) !== null;
+}
+
+function isSecureRequest(request) {
+  if (request.socket.encrypted || request.headers["x-forwarded-proto"] === "https") return true;
+  try {
+    return JSON.parse(request.headers["cf-visitor"] || "{}").scheme === "https";
+  } catch (error) {
+    return false;
   }
 }
 
-function isAuthorized(request) {
-  const token = request.headers["x-admin-token"];
-  return typeof token === "string" && token === ADMIN_TOKEN;
+function isSameOrigin(request) {
+  const origin = request.headers.origin;
+  if (!origin) return false;
+  try {
+    const parsedOrigin = new URL(origin);
+    return (parsedOrigin.protocol === "https:" || parsedOrigin.protocol === "http:") &&
+      parsedOrigin.host === request.headers.host &&
+      (!isSecureRequest(request) || parsedOrigin.protocol === "https:");
+  } catch (error) {
+    return false;
+  }
+}
+
+function serveLoginRedirect(response, pathname) {
+  const location = "/login?next=" + encodeURIComponent(pathname === "/admin/" ? "/admin/" : "/");
+  response.statusCode = 303;
+  response.setHeader("Location", location);
+  response.setHeader("Cache-Control", "no-store");
+  response.end();
+}
+
+function consumeLoginFailure(remoteAddress) {
+  const now = Date.now();
+  for (const [address, entry] of loginFailures) {
+    if (entry.resetAt <= now) loginFailures.delete(address);
+  }
+  const entry = loginFailures.get(remoteAddress);
+  if (!entry || entry.resetAt <= now) {
+    loginFailures.set(remoteAddress, { count: 1, resetAt: now + LOGIN_WINDOW_MS });
+    return { allowed: true, remaining: LOGIN_MAX_FAILURES - 1 };
+  }
+  entry.count += 1;
+  return { allowed: entry.count <= LOGIN_MAX_FAILURES, remaining: LOGIN_MAX_FAILURES - entry.count };
+}
+
+function clearLoginFailures(remoteAddress) {
+  loginFailures.delete(remoteAddress);
+}
+
+function passwordsMatch(candidate) {
+  if (typeof candidate !== "string") return false;
+  const candidateBytes = Buffer.from(candidate);
+  const expectedBytes = Buffer.from(ACCESS_PASSWORD);
+  return candidateBytes.length === expectedBytes.length && crypto.timingSafeEqual(candidateBytes, expectedBytes);
+}
+
+function isSafeReturnPath(value) {
+  return value === "/" || value === "/admin/";
+}
+
+async function handleLogin(request, response) {
+  let payload;
+  try {
+    payload = await readJsonBody(request);
+  } catch (error) {
+    sendError(response, 400, error.message);
+    return;
+  }
+
+  const remoteAddress = request.socket.remoteAddress || "unknown";
+  const currentFailures = loginFailures.get(remoteAddress);
+  if (currentFailures && currentFailures.resetAt > Date.now() && currentFailures.count >= LOGIN_MAX_FAILURES) {
+    response.setHeader("Retry-After", String(Math.ceil((currentFailures.resetAt - Date.now()) / 1000)));
+    sendError(response, 429, "尝试次数过多，请稍后再试");
+    return;
+  }
+
+  if (!payload || !passwordsMatch(payload.password)) {
+    const result = consumeLoginFailure(remoteAddress);
+    if (!result.allowed) {
+      response.setHeader("Retry-After", String(Math.ceil((loginFailures.get(remoteAddress).resetAt - Date.now()) / 1000)));
+      sendError(response, 429, "尝试次数过多，请稍后再试");
+      return;
+    }
+    sendError(response, 401, "访问密码错误");
+    return;
+  }
+
+  clearLoginFailures(remoteAddress);
+  const sessionId = crypto.randomBytes(32).toString("base64url");
+  const now = Date.now();
+  for (const [id, expiresAt] of sessions) {
+    if (expiresAt <= now) sessions.delete(id);
+  }
+  sessions.set(sessionId, now + SESSION_TTL_MS);
+  const secure = isSecureRequest(request);
+  const cookie = SESSION_COOKIE + "=" + sessionId + "; HttpOnly; SameSite=Strict; Path=/; Max-Age=" + Math.floor(SESSION_TTL_MS / 1000) + (secure ? "; Secure" : "");
+  response.setHeader("Set-Cookie", cookie);
+  sendJson(response, 200, { next: isSafeReturnPath(payload.next) ? payload.next : "/" });
+}
+
+function logout(request, response) {
+  const sessionId = getSession(request);
+  if (sessionId) sessions.delete(sessionId);
+  const secure = isSecureRequest(request);
+  response.setHeader("Set-Cookie", SESSION_COOKIE + "=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0" + (secure ? "; Secure" : ""));
+  sendJson(response, 200, { ok: true });
 }
 
 function readJsonBody(request) {
@@ -189,11 +319,6 @@ async function handleReservations(request, response, url) {
   }
 
   if (url.pathname === "/api/reservations" && request.method === "POST") {
-    if (!isAuthorized(request)) {
-      sendError(response, 401, "后台口令无效或缺失");
-      return true;
-    }
-
     let payload;
     try {
       payload = await readJsonBody(request);
@@ -234,11 +359,6 @@ async function handleReservations(request, response, url) {
 
   const idMatch = url.pathname.match(/^\/api\/reservations\/([^/]+)$/);
   if (idMatch && request.method === "DELETE") {
-    if (!isAuthorized(request)) {
-      sendError(response, 401, "后台口令无效或缺失");
-      return true;
-    }
-
     let id;
     try {
       id = decodeURIComponent(idMatch[1]);
@@ -272,11 +392,24 @@ async function handleReservations(request, response, url) {
 }
 
 function isPrivateStaticPath(relativePath) {
-  const segments = relativePath.split(path.sep);
-  return segments.some((segment) => segment.startsWith(".")) || relativePath === "server.js";
+  const segments = relativePath.split(/[\\/]/);
+  const normalizedPath = segments.join(path.sep).toLowerCase();
+  return segments.some((segment) => segment.startsWith(".")) ||
+    normalizedPath === "server.js" ||
+    normalizedPath === "data" ||
+    normalizedPath.startsWith("data" + path.sep);
 }
 
-async function serveStatic(response, urlPath) {
+function isPublicLoginAsset(relativePath) {
+  return ["login.html", "login.css", "login.js"].includes(relativePath);
+}
+
+function appendVary(response, value) {
+  const current = response.getHeader("Vary");
+  response.setHeader("Vary", current ? current + ", " + value : value);
+}
+
+async function serveStatic(request, response, urlPath, search) {
   let decodedPath;
   try {
     decodedPath = decodeURIComponent(urlPath);
@@ -285,19 +418,36 @@ async function serveStatic(response, urlPath) {
     return;
   }
 
-  const relativePath = decodedPath.replace(/^\/+/, "");
+  if (decodedPath === "/admin") {
+    response.statusCode = 308;
+    response.setHeader("Location", "/admin/" + search);
+    response.end();
+    return;
+  }
+
+  const isLoginRoute = decodedPath === "/login" || decodedPath === "/login/" || decodedPath === "/login.html";
+  const relativePath = isLoginRoute ? "login.html" : decodedPath.replace(/^\/+/, "");
   if (isPrivateStaticPath(relativePath)) {
     sendError(response, 404, "资源不存在");
     return;
   }
 
   const relativeFile = relativePath
-    ? decodedPath.endsWith("/") ? path.join(relativePath, "index.html") : relativePath
+    ? relativePath.endsWith("/") ? path.join(relativePath, "index.html") : relativePath
     : "index.html";
   const filePath = path.resolve(ROOT_DIR, relativeFile);
   const relativeToRoot = path.relative(ROOT_DIR, filePath);
   if (relativeToRoot.startsWith(".." + path.sep) || path.isAbsolute(relativeToRoot) || isPrivateStaticPath(relativeToRoot)) {
     sendError(response, 404, "资源不存在");
+    return;
+  }
+
+  if (!isPublicLoginAsset(relativeToRoot) && !hasValidSession(request)) {
+    if (relativeToRoot === "index.html" || relativeToRoot === path.join("admin", "index.html")) {
+      serveLoginRedirect(response, relativeToRoot === "index.html" ? "/" : "/admin/");
+    } else {
+      sendError(response, 401, "请先登录");
+    }
     return;
   }
 
@@ -310,6 +460,8 @@ async function serveStatic(response, urlPath) {
     response.statusCode = 200;
     response.setHeader("Content-Type", MIME_TYPES[path.extname(filePath).toLowerCase()] || "application/octet-stream");
     response.setHeader("X-Content-Type-Options", "nosniff");
+    response.setHeader("Cache-Control", "no-store");
+    appendVary(response, "Cookie");
     response.end(await fs.readFile(filePath));
   } catch (error) {
     sendError(response, error.code === "ENOENT" ? 404 : 500, error.code === "ENOENT" ? "资源不存在" : "读取资源失败");
@@ -317,9 +469,44 @@ async function serveStatic(response, urlPath) {
 }
 
 async function requestHandler(request, response) {
-  const url = new URL(request.url, "http://localhost");
+  let url;
+  try {
+    url = new URL(request.url, "http://localhost");
+  } catch (error) {
+    sendError(response, 400, "请求路径无效");
+    return;
+  }
+
+  if (url.pathname === "/api/login" && request.method === "POST") {
+    setApiHeaders(response);
+    if (!isSameOrigin(request)) {
+      sendError(response, 403, "请求来源无效");
+      return;
+    }
+    await handleLogin(request, response);
+    return;
+  }
+
+  if (url.pathname === "/api/logout" && request.method === "POST") {
+    setApiHeaders(response);
+    if (!isSameOrigin(request) || !hasValidSession(request)) {
+      sendError(response, 401, "请先登录");
+      return;
+    }
+    logout(request, response);
+    return;
+  }
+
   if (url.pathname.startsWith("/api/")) {
     setApiHeaders(response);
+    if (!hasValidSession(request)) {
+      sendError(response, 401, "请先登录");
+      return;
+    }
+    if (!isSameOrigin(request) && request.method !== "GET" && request.method !== "HEAD" && request.method !== "OPTIONS") {
+      sendError(response, 403, "请求来源无效");
+      return;
+    }
     if (request.method === "OPTIONS") {
       response.statusCode = 204;
       response.end();
@@ -343,7 +530,17 @@ async function requestHandler(request, response) {
     sendError(response, 405, "该资源只支持 GET");
     return;
   }
-  await serveStatic(response, url.pathname);
+
+  const isLoginRoute = ["/login", "/login/", "/login.html"].includes(url.pathname);
+  if (isLoginRoute && hasValidSession(request)) {
+    const requestedNext = url.searchParams.get("next");
+    response.statusCode = 303;
+    response.setHeader("Location", isSafeReturnPath(requestedNext) ? requestedNext : "/");
+    response.setHeader("Cache-Control", "no-store");
+    response.end();
+    return;
+  }
+  await serveStatic(request, response, url.pathname, url.search);
 }
 
 const server = http.createServer((request, response) => {
@@ -353,14 +550,16 @@ const server = http.createServer((request, response) => {
   });
 });
 
-ensureDataFile().then(() => {
-  if (!process.env.ADMIN_TOKEN) {
-    console.warn("ADMIN_TOKEN 未设置，当前使用仅适合本地开发的默认口令。");
-  }
-  server.listen(PORT, HOST, () => {
-    console.log("体育馆预约服务已启动: http://" + HOST + ":" + PORT);
-  });
-}).catch((error) => {
-  console.error("无法初始化预约数据文件", error);
+if (!ACCESS_PASSWORD) {
+  console.error("ACCESS_PASSWORD 未设置，服务拒绝启动。");
   process.exitCode = 1;
-});
+} else {
+  ensureDataFile().then(() => {
+    server.listen(PORT, HOST, () => {
+      console.log("体育馆预约服务已启动: http://" + HOST + ":" + PORT);
+    });
+  }).catch((error) => {
+    console.error("无法初始化预约数据文件", error);
+    process.exitCode = 1;
+  });
+}
