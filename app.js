@@ -4,7 +4,6 @@
   var chatScreen = document.getElementById("chatScreen");
   var campusScreen = document.getElementById("campusScreen");
   var MINUTES_PER_DAY = 24 * 60 * 60 * 1000;
-  var HISTORY_DAYS = 7;
   var RESERVATION_DATA_URL = "/api/reservations";
   var RESERVATION_OPTIONS = {
     "深圳校区游泳池-场地1": ["06:30", "16:30", "19:30"],
@@ -176,13 +175,9 @@
   }
 
   function renderMessages(messages) {
-    var today = new Date();
     cardsRoot.textContent = "";
 
-    messages.filter(function (message) {
-      var daysAgo = daysBetween(message.pushDate, today);
-      return daysAgo >= 0 && daysAgo <= HISTORY_DAYS;
-    }).sort(compareMessages).forEach(function (message) {
+    messages.sort(compareMessages).forEach(function (message) {
       appendTimeLabel(chatTimeLabel(message.pushDate, message.sentAt));
       appendMessage(message);
     });
