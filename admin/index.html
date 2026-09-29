@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
-  <title>预约提交系统</title>
+  <title>后台管理系统</title>
   <link rel="stylesheet" href="./admin.css">
 </head>
 <body>
@@ -12,7 +12,7 @@
     <section class="hero-panel" aria-labelledby="pageTitle">
       <div>
         <p class="school-mark">SYSU Sports</p>
-        <h1 id="pageTitle">预约提交系统</h1>
+        <h1 id="pageTitle">后台管理系统</h1>
         <p class="hero-copy">在这里登记游泳池和健身房预约。保存成功后，手机展示页会读取同一份数据。</p>
       </div>
       <a class="display-link" href="/" target="_blank" rel="noreferrer">打开展示页</a>
@@ -34,11 +34,15 @@
           <select id="reservationTime" name="reservationTime" required></select>
         </label>
         <label>
+          <span>推送日期</span>
+          <input id="pushDate" name="pushDate" type="date" required>
+        </label>
+        <label>
           <span>推送时间</span>
           <input id="sentAt" name="sentAt" type="time" step="60">
         </label>
         <button class="primary-action" type="submit">保存预约</button>
-        <p class="form-hint">推送时间留空时，服务端会使用当前时间。</p>
+        <p class="form-hint">推送时间留空时，服务端会使用当前时间；系统录入时间由服务器自动记录。</p>
         <p class="status-line" id="statusLine" role="status" aria-live="polite"></p>
       </form>
 
@@ -60,9 +64,10 @@
       <div>
         <h3 class="item-venue"></h3>
         <p class="item-time"></p>
+        <p class="item-push-time"></p>
         <p class="item-meta"></p>
       </div>
-      <button class="danger-action" type="button">取消</button>
+      <button class="danger-action" type="button">删除</button>
     </article>
   </template>
 

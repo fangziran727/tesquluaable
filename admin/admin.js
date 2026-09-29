@@ -3,6 +3,7 @@
   var venueField = document.getElementById("venue");
   var dateField = document.getElementById("date");
   var timeField = document.getElementById("reservationTime");
+  var pushDateField = document.getElementById("pushDate");
   var sentAtField = document.getElementById("sentAt");
   var statusLine = document.getElementById("statusLine");
   var reservationList = document.getElementById("reservationList");
@@ -29,7 +30,7 @@
     if (!value) return "";
     var date = new Date(value);
     if (Number.isNaN(date.getTime())) return "";
-    return "录入于 " + date.toLocaleString("zh-CN", { hour12: false });
+    return date.toLocaleString("zh-CN", { hour12: false });
   }
 
   function populateVenues() {
@@ -70,8 +71,9 @@
     }).forEach(function (reservation) {
       var fragment = template.content.cloneNode(true);
       fragment.querySelector(".item-venue").textContent = escapeText(reservation.venue);
-      fragment.querySelector(".item-time").textContent = escapeText(reservation.date) + " · " + escapeText(reservation.reservationTime);
-      fragment.querySelector(".item-meta").textContent = "推送 " + escapeText(reservation.sentAt) + (reservation.createdAt ? "　" + formatCreatedAt(reservation.createdAt) : "");
+      fragment.querySelector(".item-time").textContent = "活动时间 " + escapeText(reservation.date) + " " + escapeText(reservation.reservationTime);
+      fragment.querySelector(".item-push-time").textContent = "推送时间 " + escapeText(reservation.pushDate || reservation.date) + " " + escapeText(reservation.sentAt);
+      fragment.querySelector(".item-meta").textContent = reservation.createdAt ? "系统录入时间 " + formatCreatedAt(reservation.createdAt) : "系统录入时间未知";
       var deleteButton = fragment.querySelector(".danger-action");
       deleteButton.addEventListener("click", function () {
         deleteReservation(reservation);
@@ -132,6 +134,7 @@
       venue: venueField.value,
       date: dateField.value,
       reservationTime: timeField.value,
+      pushDate: pushDateField.value,
       sentAt: sentAtField.value
     };
     fetch("/api/reservations", {
@@ -153,10 +156,10 @@
   }
 
   function deleteReservation(reservation) {
-    if (!window.confirm("确定取消这条预约吗？\n" + reservation.venue + " " + reservation.date + " " + reservation.reservationTime)) {
+    if (!window.confirm("确定删除这条预约记录吗？\n" + reservation.venue + "，活动时间 " + reservation.date + " " + reservation.reservationTime + "，推送时间 " + (reservation.pushDate || reservation.date) + " " + reservation.sentAt)) {
       return;
     }
-    setStatus("正在取消……");
+    setStatus("正在删除……");
     fetch("/api/reservations/" + encodeURIComponent(reservation.id), {
       method: "DELETE",
       headers: {}
@@ -164,7 +167,7 @@
       if (!response.ok) return readError(response);
       return response.json();
     }).then(function () {
-      setStatus("预约已取消。", "success");
+      setStatus("预约记录已删除。", "success");
       return loadReservations();
     }).catch(function (error) {
       setStatus(error.message, "error");
@@ -191,6 +194,7 @@
   });
 
   dateField.value = localDateValue();
+  pushDateField.value = localDateValue();
   Promise.all([loadOptions(), loadReservations()]).catch(function (error) {
     setStatus(error.message, "error");
   });

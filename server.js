@@ -68,6 +68,10 @@ function validateReservationInput(payload) {
 
   const venue = typeof payload.venue === "string" ? payload.venue.trim() : "";
   const date = parseDate(payload.date);
+  const pushDateValue = payload.pushDate === undefined || payload.pushDate === null || payload.pushDate === ""
+    ? date
+    : payload.pushDate;
+  const pushDate = parseDate(pushDateValue);
   const reservationTime = typeof payload.reservationTime === "string" ? payload.reservationTime.trim() : "";
   const sentAt = payload.sentAt === undefined || payload.sentAt === null || payload.sentAt === ""
     ? getLocalTime()
@@ -77,7 +81,10 @@ function validateReservationInput(payload) {
     return { error: "不支持的场地项目" };
   }
   if (!date) {
-    return { error: "日期必须是有效的 YYYY-MM-DD 格式" };
+    return { error: "预约日期必须是有效的 YYYY-MM-DD 格式" };
+  }
+  if (!pushDate) {
+    return { error: "推送日期必须是有效的 YYYY-MM-DD 格式" };
   }
   if (RESERVATION_OPTIONS[venue].indexOf(reservationTime) === -1) {
     return { error: "该场地不支持这个预约时间" };
@@ -86,7 +93,7 @@ function validateReservationInput(payload) {
     return { error: "推送时间必须是 HH:mm 格式" };
   }
 
-  return { value: { venue, date, reservationTime, sentAt } };
+  return { value: { venue, date, reservationTime, pushDate, sentAt } };
 }
 
 function reservationKey(reservation) {

@@ -56,8 +56,9 @@
     var sentAt = typeof raw.sentAt === "string" ? raw.sentAt.trim() : "";
     var allowedTimes = RESERVATION_OPTIONS[venue];
     var date = parseReservationDate(raw.date);
+    var pushDate = parseReservationDate(raw.pushDate === undefined || raw.pushDate === null || raw.pushDate === "" ? raw.date : raw.pushDate);
 
-    if (!allowedTimes || allowedTimes.indexOf(reservationTime) === -1 || !date) {
+    if (!allowedTimes || allowedTimes.indexOf(reservationTime) === -1 || !date || !pushDate) {
       return null;
     }
     if (sentAt && !TIME_PATTERN.test(sentAt)) {
@@ -69,16 +70,20 @@
       venue: venue,
       date: date,
       reservationTime: reservationTime,
+      pushDate: pushDate,
       sentAt: sentAt || reservationTime,
+      createdAt: typeof raw.createdAt === "string" ? raw.createdAt : "",
       sourceIndex: index
     };
   }
 
   function compareMessages(left, right) {
-    var dateDiff = daySerial(left.date) - daySerial(right.date);
-    if (dateDiff !== 0) return dateDiff;
+    var pushDateDiff = daySerial(left.pushDate) - daySerial(right.pushDate);
+    if (pushDateDiff !== 0) return pushDateDiff;
     var sentDiff = timeToMinutes(left.sentAt) - timeToMinutes(right.sentAt);
     if (sentDiff !== 0) return sentDiff;
+    var dateDiff = daySerial(left.date) - daySerial(right.date);
+    if (dateDiff !== 0) return dateDiff;
     var venueDiff = VENUE_ORDER.indexOf(left.venue) - VENUE_ORDER.indexOf(right.venue);
     if (venueDiff !== 0) return venueDiff;
     var reservationDiff = timeToMinutes(left.reservationTime) - timeToMinutes(right.reservationTime);
@@ -175,10 +180,10 @@
     cardsRoot.textContent = "";
 
     messages.filter(function (message) {
-      var daysAgo = daysBetween(message.date, today);
+      var daysAgo = daysBetween(message.pushDate, today);
       return daysAgo >= 0 && daysAgo <= HISTORY_DAYS;
     }).sort(compareMessages).forEach(function (message) {
-      appendTimeLabel(chatTimeLabel(message.date, message.sentAt));
+      appendTimeLabel(chatTimeLabel(message.pushDate, message.sentAt));
       appendMessage(message);
     });
   }
@@ -189,6 +194,43 @@
       scheduleScrollToBottom();
     });
   }
+
+  var isRefreshingMessages = false;
+
+  function refreshMessages() {
+    if (isRefreshingMessages || document.hidden) return;
+    isRefreshingMessages = true;
+    var area = document.querySelector(".message-area");
+    var wasAtBottom = area && area.scrollHeight - area.scrollTop - area.clientHeight < 24;
+    var previousScrollTop = area ? area.scrollTop : 0;
+
+    fetch(RESERVATION_DATA_URL, { cache: "no-store" }).then(function (response) {
+      if (response.status === 401) {
+        window.location.replace("/login?next=%2F");
+        return null;
+      }
+      return response.ok ? response.json() : null;
+    }).then(function (data) {
+      if (!Array.isArray(data)) return;
+      var messages = data.map(normalizeReservation).filter(function (message) {
+        return message !== null;
+      });
+      renderMessages(messages);
+      if (wasAtBottom) {
+        scheduleScrollToBottom();
+      } else if (area) {
+        area.scrollTop = previousScrollTop;
+      }
+    }).then(function () {
+      isRefreshingMessages = false;
+    }, function () {
+      isRefreshingMessages = false;
+    });
+  }
+
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) refreshMessages();
+  });
 
   function showCampusScreen(updateHash) {
     chatScreen.classList.add("is-hidden");

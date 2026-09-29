@@ -7,7 +7,7 @@
   var requestedNext = params.get("next");
   var next = requestedNext === "/admin/" ? "/admin/" : "/";
 
-  title.textContent = next === "/admin/" ? "预约提交系统" : "预约记录";
+  title.textContent = next === "/admin/" ? "后台管理系统" : "预约记录";
   document.title = title.textContent;
 
   form.addEventListener("submit", function (event) {

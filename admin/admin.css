@@ -245,6 +245,7 @@ input::placeholder {
 }
 
 .item-time,
+.item-push-time,
 .item-meta {
   margin-bottom: 0;
   font-size: 13px;
@@ -256,7 +257,8 @@ input::placeholder {
   font-weight: 700;
 }
 
-.item-meta {
+.item-meta,
+.item-push-time {
   color: var(--muted);
   font-size: 11px;
 }
